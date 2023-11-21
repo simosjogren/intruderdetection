@@ -1,5 +1,5 @@
 # Intruder Detection
-Projectfor intruder detection application (Python, OpenCV)
+Projectfor intruder detection application (Python, OpenCV, Tensorflow)
 
 Dataset for human recognition: https://www.kaggle.com/datasets/constantinwerner/human-detection-dataset/data
 
