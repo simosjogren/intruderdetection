@@ -98,6 +98,6 @@ def play_video(video_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video_path", default="../data/intrusion.avi", help="path to video")
+    parser.add_argument("--video_path", default="../intrusion.avi", help="path to video")
     args = parser.parse_args()
     play_video(args.video_path)
