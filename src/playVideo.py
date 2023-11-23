@@ -6,12 +6,12 @@ import numpy as np
 from visualizations import visualize_predictions
 
 # Load the model
-model_path = '../neural_networks/human_model.h5'
+# model_path = '../neural_networks/human_model.h5'
 # loaded_model = load_model(model_path)
 
 # Create the background subtractor with selective updating
 bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-    history=50,        # The number of last frames that affect the background model.
+    history=15,        # The number of last frames that affect the background model.
     varThreshold=-1,    # Mahalanobis distance threshold.
     detectShadows=False   # If True, the model will detect shadows and mark them as 127.
 )
@@ -80,57 +80,61 @@ def extractROI(frame, binary_mask, padding=25):
     return roi
 
 
-def performLabeling(value, threshold=0.5):
-    if value >= threshold:
-        # Human found
-        return True
-    else:
-        # No human found
-        return False
-    
+def handleBinaryMask_v2(binaryMaskRaw, dilation_iterations=1, min_blob_area=50):
+    # Apply dilation to connect nearby edges
+    dilated_edges = cv2.dilate(binaryMaskRaw, None, iterations=dilation_iterations)
 
-def handleBinaryMask(binary_mask):
-    # Display the results
+    # Find contours in the dilated image
+    contours, _ = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Create a mask for the blobs
+    blobs_mask = np.zeros_like(binaryMaskRaw)
+
+    # Iterate through contours and draw filled blobs
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > min_blob_area:
+            cv2.drawContours(blobs_mask, [contour], -1, 255, thickness=cv2.FILLED)
+
+    contours, _ = cv2.findContours(blobs_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    print('Amount of contours: ', contours.__len__())
+
+    cv2.imshow('blobs_mask', blobs_mask)
+    return blobs_mask
+
+
+def getBinaryMask(gray_frame_filtered):
+    _, binary_mask = cv2.threshold(gray_frame_filtered, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     cv2.imshow('binary_mask', binary_mask)
-
-    # Perform opening operation to remove noise
-    kernel = np.ones((2, 2), np.uint8)
-    opening_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_OPEN, kernel)
-
-    # Assuming 'binary_mask' is your binary mask
-    _, labeled_image = cv2.connectedComponents(opening_mask)
-    blob_areas = [np.sum(labeled_image == label) for label in range(1, np.max(labeled_image) + 1)]
-    # Define a threshold for blob density
-    density_threshold = 10  # Iterated to this value
-    # Identify regions of interest based on blob density
-    roi_mask = np.zeros_like(binary_mask, dtype=np.uint8)
-    for label, area in enumerate(blob_areas, start=1):
-        if area > density_threshold:
-            roi_mask[labeled_image == label] = 255
-
-    # Y-dilation to extend the ROI vertically
-    kernel_y_size = 5
-    kernel_y = np.ones((kernel_y_size, 1), np.uint8)  # Adjust the kernel size based on your needs
-    dilated_roi_y = cv2.dilate(roi_mask, kernel_y, iterations=1)
-
-    # Closing operation for refinement
-    kernel = np.ones((5, 5), np.uint8)
-    closing_roi = cv2.morphologyEx(dilated_roi_y, cv2.MORPH_CLOSE, kernel)
-
-    return closing_roi
-
-
-def getBinaryMask(gray_frame_filtered, learningRate=0.15):
-    # Apply background subtraction
-    fg_mask = bg_subtractor.apply(gray_frame_filtered, learningRate=learningRate)
-    _, binary_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return binary_mask
 
 
 def handleGrayscaleFiltering(gray_frame):
     # Apply bilateral and Gaussian filtering
-    gray_frame_filtered = cv2.bilateralFilter(gray_frame, d=7, sigmaColor=45, sigmaSpace=60)
+    gray_frame_filtered = cv2.bilateralFilter(gray_frame, d=7, sigmaColor=45, sigmaSpace=45)
     return gray_frame_filtered
+
+
+def handleEdgeDetection(gray_frame_filtered, lower_threshold=69, upper_threshold=70):
+    # Apply Canny edge detection
+    edges = cv2.Canny(gray_frame_filtered, lower_threshold, upper_threshold)
+    # You can further process the 'edges' image if needed
+    gray_frame_filtered = cv2.bitwise_and(gray_frame_filtered, gray_frame_filtered, mask=edges)
+    cv2.imshow('gray_frame_edges', gray_frame_filtered)
+    return gray_frame_filtered
+
+
+def extractHumanObject(binary_mask, learningRate):
+    fg_mask = bg_subtractor.apply(binary_mask, learningRate=learningRate)
+    # Opening
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
+    # Closing
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
+    cv2.imshow('fg_mask', fg_mask)
+    return fg_mask
+
 
 def applyMaskToImage(image, binary_mask, color_for_masked_region=[0, 0, 255]):
     # Convert the binary mask to a 3-channel image
@@ -146,7 +150,6 @@ def applyMaskToImage(image, binary_mask, color_for_masked_region=[0, 0, 255]):
     result_image = cv2.bitwise_or(image, masked_region)
 
     return result_image
-
 
 
 def play_video(video_path):
@@ -166,18 +169,27 @@ def play_video(video_path):
         # Convert the frame to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+        # Human operations
+        human_binary_frame = extractHumanObject(gray_frame.copy(), learningRate=0.5)
+
         # Apply grayscale filtering operations
         gray_frame_filtered = handleGrayscaleFiltering(gray_frame)
 
+        gray_frame_edges = handleEdgeDetection(gray_frame_filtered)
+
         # Convert grayscale to binary mask
-        binaryMaskRaw = getBinaryMask(gray_frame_filtered, learningRate=0.15)
+        binary_mask_raw = getBinaryMask(gray_frame_edges)
 
-        # Perform operations to the binary mask
-        binaryFixed = handleBinaryMask(binaryMaskRaw)
+        # Overlay binary_mask_raw with humanObject and exclude human from binary_mask_raw
+        binary_mask_with_deleted_movement = cv2.bitwise_and(binary_mask_raw, cv2.bitwise_not(human_binary_frame))
 
-        maskedFrame = applyMaskToImage(frame, binaryFixed)
+        cv2.imshow('binary_mask_with_deleted_movement', binary_mask_with_deleted_movement)
 
-        cv2.imshow('maskedFrame', maskedFrame)
+        binary_frame_for_objects = handleBinaryMask_v2(binary_mask_with_deleted_movement)
+
+        masked_frame = applyMaskToImage(frame, binary_frame_for_objects)
+
+        cv2.imshow('maskedFrame', masked_frame)
 
         # Stop playing when 'q' is pressed
         if cv2.waitKey(25) == ord('q'):
