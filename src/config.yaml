@@ -1,0 +1,8 @@
+
+path: C://Users//simos//Desktop//VAIHTO//KOULU//Intruder detection git//intruderdetection//datasets//human_datasetv2
+train: images//train
+val: images//train
+
+# Classes
+names:
+  0: human

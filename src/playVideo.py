@@ -1,13 +1,20 @@
 import cv2
 import argparse
 import numpy as np
-from tensorflow.keras.models import load_model
+# from tensorflow.keras.models import load_model
 
 from visualizations import visualize_predictions
 
 # Load the model
 model_path = '../neural_networks/human_model.h5'
-loaded_model = load_model(model_path)
+# loaded_model = load_model(model_path)
+
+# Create the background subtractor with selective updating
+bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+    history=50,        # The number of last frames that affect the background model.
+    varThreshold=-1,    # Mahalanobis distance threshold.
+    detectShadows=False   # If True, the model will detect shadows and mark them as 127.
+)
 
 
 def rescaleImageForNN(image, target_size=(256, 256)):
@@ -36,7 +43,7 @@ def rescaleImageForNN(image, target_size=(256, 256)):
     return canvas
 
 
-def extractROI(frame, binary_mask, padding=15):
+def extractROI(frame, binary_mask, padding=25):
     # Dilate and erode the binary mask to reduce noise
     kernel = np.ones((5, 5), np.uint8)
     dilated_mask = cv2.dilate(binary_mask, kernel, iterations=1)
@@ -80,20 +87,70 @@ def performLabeling(value, threshold=0.5):
     else:
         # No human found
         return False
+    
+
+def handleBinaryMask(binary_mask):
+    # Display the results
+    cv2.imshow('binary_mask', binary_mask)
+
+    # Perform opening operation to remove noise
+    kernel = np.ones((2, 2), np.uint8)
+    opening_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_OPEN, kernel)
+
+    # Assuming 'binary_mask' is your binary mask
+    _, labeled_image = cv2.connectedComponents(opening_mask)
+    blob_areas = [np.sum(labeled_image == label) for label in range(1, np.max(labeled_image) + 1)]
+    # Define a threshold for blob density
+    density_threshold = 10  # Iterated to this value
+    # Identify regions of interest based on blob density
+    roi_mask = np.zeros_like(binary_mask, dtype=np.uint8)
+    for label, area in enumerate(blob_areas, start=1):
+        if area > density_threshold:
+            roi_mask[labeled_image == label] = 255
+
+    # Y-dilation to extend the ROI vertically
+    kernel_y_size = 5
+    kernel_y = np.ones((kernel_y_size, 1), np.uint8)  # Adjust the kernel size based on your needs
+    dilated_roi_y = cv2.dilate(roi_mask, kernel_y, iterations=1)
+
+    # Closing operation for refinement
+    kernel = np.ones((5, 5), np.uint8)
+    closing_roi = cv2.morphologyEx(dilated_roi_y, cv2.MORPH_CLOSE, kernel)
+
+    return closing_roi
+
+
+def getBinaryMask(gray_frame_filtered, learningRate=0.15):
+    # Apply background subtraction
+    fg_mask = bg_subtractor.apply(gray_frame_filtered, learningRate=learningRate)
+    _, binary_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return binary_mask
+
+
+def handleGrayscaleFiltering(gray_frame):
+    # Apply bilateral and Gaussian filtering
+    gray_frame_filtered = cv2.bilateralFilter(gray_frame, d=7, sigmaColor=45, sigmaSpace=60)
+    return gray_frame_filtered
+
+def applyMaskToImage(image, binary_mask, color_for_masked_region=[0, 0, 255]):
+    # Convert the binary mask to a 3-channel image
+    binary_mask_color = cv2.cvtColor(binary_mask, cv2.COLOR_GRAY2BGR)
+
+    # Ensure that color_for_masked_region is a NumPy array with dtype=np.uint8
+    color_for_masked_region = np.array(color_for_masked_region, dtype=np.uint8)
+
+    # Use the binary mask to create a mask for the colored region
+    masked_region = cv2.bitwise_and(binary_mask_color, color_for_masked_region)
+
+    # Combine the masked region and the original image using bitwise_or
+    result_image = cv2.bitwise_or(image, masked_region)
+
+    return result_image
+
 
 
 def play_video(video_path):
     cap = cv2.VideoCapture(video_path)
-
-    # Create the background subtractor with selective updating
-    bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-        history=50,        # The number of last frames that affect the background model.
-        varThreshold=-1,    # Mahalanobis distance threshold.
-        detectShadows=False   # If True, the model will detect shadows and mark them as 127.
-    )
-
-    learningRate = 0.04   # For the .apply phase. -1 means automatic learning rate.
-
     index = 1
     prediction_results = []
 
@@ -109,44 +166,18 @@ def play_video(video_path):
         # Convert the frame to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Apply bilateral and Gaussian filtering
-        gray_frame_filtered1 = cv2.bilateralFilter(gray_frame, d=9, sigmaColor=45, sigmaSpace=15)
-        gray_frame_filtered2 = cv2.GaussianBlur(gray_frame_filtered1, (5, 5), 0)
+        # Apply grayscale filtering operations
+        gray_frame_filtered = handleGrayscaleFiltering(gray_frame)
 
-        # Apply background subtraction
-        fg_mask = bg_subtractor.apply(gray_frame_filtered2, learningRate=learningRate)
+        # Convert grayscale to binary mask
+        binaryMaskRaw = getBinaryMask(gray_frame_filtered, learningRate=0.15)
 
-        _, binary_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Perform operations to the binary mask
+        binaryFixed = handleBinaryMask(binaryMaskRaw)
 
-        # Define a kernel for the opening operation
-        kernel_size_open = 3
-        kernel_open = np.ones((kernel_size_open, kernel_size_open), np.uint8)
-        opened_frame = cv2.morphologyEx(binary_mask, cv2.MORPH_OPEN, kernel_open)
+        maskedFrame = applyMaskToImage(frame, binaryFixed)
 
-        # Define a kernel for the closing operation
-        kernel_size_close = 9
-        kernel_close = np.ones((kernel_size_close, kernel_size_close), np.uint8)
-        closed_frame = cv2.morphologyEx(opened_frame, cv2.MORPH_CLOSE, kernel_close)
-
-        # Assuming you have a frame and a binary_mask
-        extracted_area = extractROI(gray_frame, binary_mask)
-
-        # If the extracted_area is not None, you can use it
-        if extracted_area is not None:
-            resized_image = rescaleImageForNN(extracted_area)
-            # Normalize pixel values to be between 0 and 1
-            normalized_image = resized_image / 255.0
-            # Expand dimensions to create a batch size of 1
-            input_image = np.expand_dims(normalized_image, axis=0)
-            predictions = loaded_model.predict(input_image)
-            prediction_results.append(predictions[0][0])
-            if performLabeling(predictions[0][0]):
-                print("Human found")
-            cv2.imshow('Extracted Area', resized_image)
-            # cv2.waitKey(0)
-
-        # Display the results
-        cv2.imshow('Difference', closed_frame)
+        cv2.imshow('maskedFrame', maskedFrame)
 
         # Stop playing when 'q' is pressed
         if cv2.waitKey(25) == ord('q'):
@@ -158,7 +189,8 @@ def play_video(video_path):
     cv2.destroyAllWindows()
 
     # You can add your own visualization code here based on prediction_results
-    visualize_predictions(prediction_results)
+    if (prediction_results is not None) and (len(prediction_results) > 0):
+        visualize_predictions(prediction_results)
 
 
 if __name__ == "__main__":

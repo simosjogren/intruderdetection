@@ -3,3 +3,7 @@ mlenv
 neural_networks
 data
 src/__pycache__
+runs
+src/*.pt
+src/*.png
+datasets
