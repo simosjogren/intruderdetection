@@ -1,5 +1,5 @@
 # Intruder Detection
-Projectfor intruder detection application (Python, OpenCV, Tensorflow)
+Project for intruder detection application (Python, OpenCV, Pandas)
 
 Dataset for human recognition: https://www.kaggle.com/datasets/constantinwerner/human-detection-dataset/data
 
@@ -10,8 +10,7 @@ Environment settings:
 pip install -r requirements.txt
 
 Usage:
-loadAndTrainHumans.py & loadAndTrainObjects.py for neural network training.
-playVideo.py for filtering the video for human moving detection.
+'python main.js' - launches the process with default settings.
 
 Video (download it to root folder):
 https://virtuale.unibo.it/pluginfile.php/1650712/course/section/540236/rilevamento-intrusioni-video.avi
