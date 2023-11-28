@@ -1,9 +1,7 @@
 import datetime
 import os
 import pandas as pd
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+import xlsxwriter
 
 def makeFrameDict(contours, human_blob, frame_idx):
     ## TODO: Human object handling
@@ -46,43 +44,52 @@ def formatFileName(folder_path, fileNameEnding):
     return filename
 
 
-def writeOutputFileEXCEL(data_structure, folder_path='./output_files'):
+def writeOutputFileEXCEL(data_structure, folder_path='../output_files'): #consider adding coloring to the columns here
 
     checkFolderExistence(folder_path)
-    filename = formatFileName(folder_path, ".pdf")
 
-    pdf = SimpleDocTemplate(filename, pagesize=letter)
-    elements = []
+    filename = formatFileName(folder_path, ".xlsx")
 
-    style = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ])
+    formatted_rows = []
 
-    # Indexes for the excel PDF
-    table_data = [['Frame Index', 'Number of Detected Objects', 'Object Identifier', 'Area', 'Perimeter', 'Classification']]
-
+    current_row = 1
     for frame in data_structure:
-        num_objects = frame['number_of_detected_objects']
-        if num_objects > 0:
-            for obj in frame['frame_data']:
-                row = [frame['frame_index'], num_objects, obj['identifier'], obj['area'], obj['perimeter'], obj['classification']]
-                table_data.append(row)
-            style.add('SPAN', (0, len(table_data)-num_objects), (0, len(table_data)-1))
-            style.add('SPAN', (1, len(table_data)-num_objects), (1, len(table_data)-1))
+        frame_idx = frame['frame_index']
+        number_of_objects = frame['number_of_detected_objects']
 
-    t = Table(table_data)
-    t.setStyle(style)
-    elements.append(t)
+        for obj in frame['frame_data']:
+            row = {
+                'frame_index': frame_idx,
+                'number_of_detected_objects': number_of_objects,
+                'object_identifier': obj['identifier'],
+                'area': obj['area'],
+                'perimeter': obj['perimeter'],
+                'classification': obj['classification']
+            }
+            formatted_rows.append(row)
 
-    try:
-        print(f"Current Working Directory: {os.getcwd()}")
-        pdf.build(elements)
-        print(f"PDF file has been created: {filename}")
-    except Exception as e:
-        print(f"Error during PDF creation: {e}")
+        if number_of_objects > 0:
+            current_row += number_of_objects
+
+
+    df = pd.DataFrame(formatted_rows)
+
+
+    with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name='Sheet1', index=False)
+
+
+        workbook = writer.book
+        worksheet = writer.sheets['Sheet1']
+
+
+        current_row = 2
+        for frame in data_structure:
+            number_of_objects = frame['number_of_detected_objects']
+            if number_of_objects > 0:
+                end_row = current_row + number_of_objects - 1
+                worksheet.merge_range(f'A{current_row}:A{end_row}', frame['frame_index'])
+                worksheet.merge_range(f'B{current_row}:B{end_row}', number_of_objects)
+                current_row += number_of_objects
+
+    print(f"Excel file has been created: {filename}")
