@@ -1,8 +1,6 @@
-import json
 import datetime
 import os
 import pandas as pd
-import openpyxl
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -48,17 +46,13 @@ def formatFileName(folder_path, fileNameEnding):
     return filename
 
 
-def writeOutputFileEXCEL(data_structure, folder_path='../output_files'):
+def writeOutputFileEXCEL(data_structure, folder_path='./output_files'):
 
     checkFolderExistence(folder_path)
-
-
     filename = formatFileName(folder_path, ".pdf")
-
 
     pdf = SimpleDocTemplate(filename, pagesize=letter)
     elements = []
-
 
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -70,27 +64,25 @@ def writeOutputFileEXCEL(data_structure, folder_path='../output_files'):
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ])
 
-
+    # Indexes for the excel PDF
     table_data = [['Frame Index', 'Number of Detected Objects', 'Object Identifier', 'Area', 'Perimeter', 'Classification']]
 
     for frame in data_structure:
-
         num_objects = frame['number_of_detected_objects']
         if num_objects > 0:
             for obj in frame['frame_data']:
                 row = [frame['frame_index'], num_objects, obj['identifier'], obj['area'], obj['perimeter'], obj['classification']]
                 table_data.append(row)
-
             style.add('SPAN', (0, len(table_data)-num_objects), (0, len(table_data)-1))
             style.add('SPAN', (1, len(table_data)-num_objects), (1, len(table_data)-1))
 
-
     t = Table(table_data)
     t.setStyle(style)
-
     elements.append(t)
 
-
-    pdf.build(elements)
-
-    print(f"PDF file has been created: {filename}")
+    try:
+        print(f"Current Working Directory: {os.getcwd()}")
+        pdf.build(elements)
+        print(f"PDF file has been created: {filename}")
+    except Exception as e:
+        print(f"Error during PDF creation: {e}")
