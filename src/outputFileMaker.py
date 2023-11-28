@@ -3,7 +3,6 @@ import datetime
 import os
 import pandas as pd
 import openpyxl
-
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
