@@ -2,6 +2,11 @@ import json
 import datetime
 import os
 import pandas as pd
+import openpyxl
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
 def makeFrameDict(contours, human_blob, frame_idx):
     ## TODO: Human object handling
@@ -44,33 +49,49 @@ def formatFileName(folder_path, fileNameEnding):
     return filename
 
 
-def writeOutputFileJSON(data_structure, folder_path='../output_files'):
-    '''
-    Currently dumps data just as a JSON object to a file.
-    Preferred to use the EXCEL type, use only this if problems with Pandas.
-    '''
-    checkFolderExistence(folder_path)
-    filename = formatFileName(folder_path, ".txt")
-
-    # Open the file in write mode
-    with open(filename, 'w') as file:
-        # Use json.dump to write the dictionary to the file
-        json.dump(data_structure, file)
-
-    print(f"Dictionary has been written to {filename}")
-
-
 def writeOutputFileEXCEL(data_structure, folder_path='../output_files'):
-    '''
-    Currently dumps data as EXCEL format to a file.
-    '''
+
     checkFolderExistence(folder_path)
-    filename = formatFileName(folder_path, ".xlsx")
 
-    # Convert the dictionary to a pandas DataFrame
-    df = pd.DataFrame(data_structure)
 
-    # Write the DataFrame to an Excel file
-    df.to_excel(filename, index=False)
+    filename = formatFileName(folder_path, ".pdf")
 
-    print(f"Excel file has been created: {filename}")
+
+    pdf = SimpleDocTemplate(filename, pagesize=letter)
+    elements = []
+
+
+    style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ])
+
+
+    table_data = [['Frame Index', 'Number of Detected Objects', 'Object Identifier', 'Area', 'Perimeter', 'Classification']]
+
+    for frame in data_structure:
+
+        num_objects = frame['number_of_detected_objects']
+        if num_objects > 0:
+            for obj in frame['frame_data']:
+                row = [frame['frame_index'], num_objects, obj['identifier'], obj['area'], obj['perimeter'], obj['classification']]
+                table_data.append(row)
+
+            style.add('SPAN', (0, len(table_data)-num_objects), (0, len(table_data)-1))
+            style.add('SPAN', (1, len(table_data)-num_objects), (1, len(table_data)-1))
+
+
+    t = Table(table_data)
+    t.setStyle(style)
+
+    elements.append(t)
+
+
+    pdf.build(elements)
+
+    print(f"PDF file has been created: {filename}")
