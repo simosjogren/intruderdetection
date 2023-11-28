@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 # from tensorflow.keras.models import load_model
 
-from visualizations import visualize_predictions
+from outputFileMaker import makeFrameDict, writeOutputFile
 
 # Load the model
 # model_path = '../neural_networks/human_model.h5'
@@ -100,7 +100,7 @@ def handleBinaryMask_v2(binaryMaskRaw, dilation_iterations=1, min_blob_area=50):
     print('Amount of contours: ', contours.__len__())
 
     cv2.imshow('blobs_mask', blobs_mask)
-    return blobs_mask
+    return contours, blobs_mask
 
 
 def getBinaryMask(gray_frame_filtered):
@@ -155,7 +155,7 @@ def applyMaskToImage(image, binary_mask, color_for_masked_region=[0, 0, 255]):
 def play_video(video_path):
     cap = cv2.VideoCapture(video_path)
     index = 1
-    prediction_results = []
+    output_file = []
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -169,27 +169,30 @@ def play_video(video_path):
         # Convert the frame to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Human operations
-        human_binary_frame = extractHumanObject(gray_frame.copy(), learningRate=0.5)
-
-        # Apply grayscale filtering operations
+        # Apply basic grayscale filtering operations to the object recognition frame
         gray_frame_filtered = handleGrayscaleFiltering(gray_frame)
 
+        # Lets separate the human out at this spot
+        human_binary_frame = extractHumanObject(gray_frame_filtered.copy(), learningRate=0.5)
+
+        # Edge separation
         gray_frame_edges = handleEdgeDetection(gray_frame_filtered)
 
-        # Convert grayscale to binary mask
+        # Convert grayscale -> binary mask
         binary_mask_raw = getBinaryMask(gray_frame_edges)
 
-        # Overlay binary_mask_raw with humanObject and exclude human from binary_mask_raw
+        # Overlay binary_mask_raw with separated human and exclude human from binary_mask_raw
         binary_mask_with_deleted_movement = cv2.bitwise_and(binary_mask_raw, cv2.bitwise_not(human_binary_frame))
 
         cv2.imshow('binary_mask_with_deleted_movement', binary_mask_with_deleted_movement)
 
-        binary_frame_for_objects = handleBinaryMask_v2(binary_mask_with_deleted_movement)
+        contours, binary_frame_for_objects = handleBinaryMask_v2(binary_mask_with_deleted_movement)
 
         masked_frame = applyMaskToImage(frame, binary_frame_for_objects)
 
         cv2.imshow('maskedFrame', masked_frame)
+
+        output_file.append(makeFrameDict(contours, human_binary_frame, index))
 
         # Stop playing when 'q' is pressed
         if cv2.waitKey(25) == ord('q'):
@@ -199,10 +202,8 @@ def play_video(video_path):
 
     cap.release()
     cv2.destroyAllWindows()
-
-    # You can add your own visualization code here based on prediction_results
-    if (prediction_results is not None) and (len(prediction_results) > 0):
-        visualize_predictions(prediction_results)
+    # Write the outputfile to folder.
+    writeOutputFile(output_file)
 
 
 if __name__ == "__main__":
