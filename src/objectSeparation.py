@@ -13,7 +13,7 @@ def handleEdgeDetection(gray_frame_filtered, lower_threshold=69, upper_threshold
     return gray_frame_filtered
 
 
-def getBinaryMask(gray_frame_filtered):
+def getBinaryMaskForObject(gray_frame_filtered):
     '''
     Converts gray-scaled frame for binary mask
     '''

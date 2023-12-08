@@ -6,15 +6,15 @@ import numpy as np
 # Local modules import
 from src.outputFileMaker import makeFrameDict, writeOutputFileEXCEL
 from src.humanSeparation import extractHumanObject
-from src.objectSeparation import handleEdgeDetection, getBinaryMask, formBlobsAndContours, separateHumanFromObjectFrame
+from src.objectSeparation import handleEdgeDetection, getBinaryMaskForObject, formBlobsAndContours, separateHumanFromObjectFrame
 from src.userVisualization import applyMaskToImage
 from src.preProcessingMethods import handleGrayscaleFiltering
 
 
 # Create the background subtractor with selective updating
 bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-    history=15,        # The number of last frames that affect the background model.
-    varThreshold=-1,    # Mahalanobis distance threshold.
+    history=30,        # The number of last frames that affect the background model.
+    varThreshold=15,    # Mahalanobis distance threshold.
     detectShadows=False   # If True, the model will detect shadows and mark them as 127.
 )
 
@@ -23,6 +23,9 @@ def play_video(video_path):
     cap = cv2.VideoCapture(video_path)
     index = 1
     output_file = []
+
+    alpha = 0.0001  # Adaptation rate for blind background updating
+    background_model = None
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -36,17 +39,22 @@ def play_video(video_path):
         # Convert the frame to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+        if background_model is None:
+            # Initialize the background model with the first frame
+            background_model = gray_frame.astype(np.float32)
+
         # Apply basic grayscale filtering operations to the object recognition frame
         gray_frame_filtered = handleGrayscaleFiltering(gray_frame)
 
         # Lets separate the human out at this spot
-        human_binary_frame = extractHumanObject(gray_frame_filtered.copy(), bg_subtractor, learningRate=0.5)
+        human_binary_frame, background_model = extractHumanObject(gray_frame, alpha, background_model)
+
 
         # Edge separation
         gray_frame_edges = handleEdgeDetection(gray_frame_filtered)
 
         # Convert grayscale -> binary mask
-        binary_mask_raw = getBinaryMask(gray_frame_edges)
+        binary_mask_raw = getBinaryMaskForObject(gray_frame_edges)
 
         # Overlay binary_mask_raw with separated human and exclude human from binary_mask_raw
         binary_mask_with_deleted_movement = separateHumanFromObjectFrame(binary_mask_raw, human_binary_frame)

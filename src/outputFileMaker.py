@@ -1,7 +1,6 @@
 import datetime
 import os
 import pandas as pd
-import xlsxwriter
 
 def makeFrameDict(contours, human_blob, frame_idx):
     ## TODO: Human object handling
@@ -44,10 +43,9 @@ def formatFileName(folder_path, fileNameEnding):
     return filename
 
 
-def writeOutputFileEXCEL(data_structure, folder_path='../output_files'): #consider adding coloring to the columns here
+def writeOutputFileEXCEL(data_structure, folder_path='./output_files'): #consider adding coloring to the columns here
 
     checkFolderExistence(folder_path)
-
     filename = formatFileName(folder_path, ".xlsx")
 
     formatted_rows = []
@@ -71,18 +69,11 @@ def writeOutputFileEXCEL(data_structure, folder_path='../output_files'): #consid
         if number_of_objects > 0:
             current_row += number_of_objects
 
-
     df = pd.DataFrame(formatted_rows)
-
 
     with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
         df.to_excel(writer, sheet_name='Sheet1', index=False)
-
-
-        workbook = writer.book
         worksheet = writer.sheets['Sheet1']
-
-
         current_row = 2
         for frame in data_structure:
             number_of_objects = frame['number_of_detected_objects']
