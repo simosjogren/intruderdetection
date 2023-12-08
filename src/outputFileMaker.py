@@ -1,18 +1,20 @@
 import datetime
 import os
 import pandas as pd
+import cv2
+
 
 def makeFrameDict(contours, human_blob, frame_idx):
     ## TODO: Human object handling
     print("Index: ", frame_idx)
-    print('Amount of contours: ', contours.__len__())
+
     amount_of_objects = contours.__len__()
     frame_data = []
     for n in range(amount_of_objects):
         object_data = {}
         object_data["identifier"] = n
-        object_data["area"] = 100   # TODO
-        object_data["perimeter"] = 100  # TODO
+        object_data["area"] = int(cv2.contourArea(contours[n]))
+        object_data["perimeter"] = int(cv2.arcLength(contours[n], True))
         object_data["other_blob_features"] = [] # TODO
         object_data["classification"] = "object"
         frame_data.append(object_data)
