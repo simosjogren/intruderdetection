@@ -1,9 +1,13 @@
 # Intruder Detection
 Project for intruder detection application (Python, OpenCV, Pandas)
 
-Dataset for human recognition: https://www.kaggle.com/datasets/constantinwerner/human-detection-dataset/data
 
-Instructions:
+Run application on Windows-platform:
+1. Open powershell
+2. Run: ./start_windows.bat
+
+
+Platform independent instructions:
 [Change Detection Project.pdf](https://github.com/simosjogren/intruderdetection/files/13237375/Change.Detection.Project.pdf)
 
 Environment settings:

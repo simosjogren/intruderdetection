@@ -7,7 +7,7 @@ import numpy as np
 from src.outputFileMaker import makeFrameDict, writeOutputFileEXCEL
 from src.humanSeparation import extractHumanObject
 from src.objectSeparation import handleEdgeDetection, getBinaryMaskForObject, formBlobsAndContours, separateHumanFromObjectFrame
-from src.userVisualization import applyMaskToImage
+from src.userVisualization import applyContoursToImage
 from src.preProcessingMethods import handleGrayscaleFiltering
 
 
@@ -24,7 +24,7 @@ def play_video(video_path):
     index = 1
     output_file = []
 
-    alpha = 0.0001  # Adaptation rate for blind background updating
+    alpha = 0.9999  # Adaptation rate for blind background updating
     background_model = None
 
     while cap.isOpened():
@@ -49,7 +49,6 @@ def play_video(video_path):
         # Lets separate the human out at this spot
         human_binary_frame, background_model = extractHumanObject(gray_frame, alpha, background_model)
 
-
         # Edge separation
         gray_frame_edges = handleEdgeDetection(gray_frame_filtered)
 
@@ -60,17 +59,14 @@ def play_video(video_path):
         binary_mask_with_deleted_movement = separateHumanFromObjectFrame(binary_mask_raw, human_binary_frame)
 
         # Find and separate the contours (gives only raw format of contours, needs filtering.)
-        contours, binary_frame_for_objects = formBlobsAndContours(binary_mask_with_deleted_movement)
-
-        # TODO: Perform contour filtering: get small contours off, try to locate the most relevant ones only
-        # TODO: Count atleast area & perimeter for every recognized object.
-
-        # Apply the blob/object recognition to the actual frame & represent it to user.
-        outputImage = applyMaskToImage(frame, binary_frame_for_objects)
+        object_contours, _ = formBlobsAndContours(binary_mask_with_deleted_movement)
 
         # Export the given data to dict format as a JSON like object for future file export.
-        frameData = makeFrameDict(contours, human_binary_frame, index)
+        frameData = makeFrameDict(object_contours, human_binary_frame, index)
         output_file.append(frameData)
+
+        # Represent the objects to the user
+        applyContoursToImage(frame, object_contours, human_binary_frame)
 
         # Stop playing when 'q' is pressed
         if cv2.waitKey(25) == ord('q'):

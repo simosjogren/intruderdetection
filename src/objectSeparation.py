@@ -31,6 +31,11 @@ def separateHumanFromObjectFrame(binary_mask_raw, human_binary_frame):
 def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50):
     '''
     Separating objects and raw contours out of the given binary mask.
+
+    # TODO: Perform the filtering of the object contours: keep only those that have the
+    features that we are looking for from an object
+    # TODO: Find a better way to identify the objects. Currently, it looks very epilectical because it
+    always just randomizes the colors for each because they are not identified.
     '''
     # Apply dilation to connect nearby edges
     dilated_edges = cv2.dilate(binaryMaskRaw, None, iterations=dilation_iterations)
