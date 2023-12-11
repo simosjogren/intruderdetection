@@ -1,22 +1,42 @@
 import datetime
 import os
 import pandas as pd
+import numpy as np
 import cv2
 
-
 def makeFrameDict(contours, human_blob, frame_idx):
-    ## TODO: Human object handling
     print("Index: ", frame_idx)
 
-    amount_of_objects = contours.__len__()
+    amount_of_objects = len(contours)  # Use len() directly for simplicity
     frame_data = []
-    for n in range(amount_of_objects):
+
+    for n, contour in enumerate(contours):
         object_data = {}
         object_data["identifier"] = n
-        object_data["area"] = int(cv2.contourArea(contours[n]))
-        object_data["perimeter"] = int(cv2.arcLength(contours[n], True))
-        object_data["other_blob_features"] = [] # TODO
-        object_data["classification"] = "object"
+        object_data["area"] = int(cv2.contourArea(contour))
+        object_data["perimeter"] = int(cv2.arcLength(contour, True))
+
+        # Compute the bounding box for the contour
+        x, y, w, h = cv2.boundingRect(contour)
+
+        # Compute additional features
+        aspect_ratio = float(w) / h if h != 0 else 0.0
+        circularity = 4 * np.pi * object_data["area"] / (object_data["perimeter"] ** 2) if object_data["perimeter"] != 0 else 0.0
+
+        # Solidity is the ratio of contour area to its convex hull area
+        hull = cv2.convexHull(contour)
+        hull_area = cv2.contourArea(hull)
+        solidity = object_data["area"] / hull_area if hull_area != 0 else 0.0
+
+        # Add features to the object_data dictionary
+        object_data["aspect_ratio"] = aspect_ratio
+        object_data["circularity"] = circularity
+        object_data["solidity"] = solidity
+
+        # Perform classification based on features
+        classification = classifyBlob(object_data)  # Implement your classification logic
+
+        object_data["classification"] = classification
         frame_data.append(object_data)
 
     return {
@@ -24,6 +44,21 @@ def makeFrameDict(contours, human_blob, frame_idx):
         'number_of_detected_objects': amount_of_objects,
         'frame_data': frame_data
     }
+
+
+def classifyBlob(blob_data):
+    # Example feature extraction
+    area = blob_data["area"]
+    perimeter = blob_data["perimeter"]
+    aspect_ratio = blob_data["aspect_ratio"]  # Add this feature to the makeFrameDict function
+
+    # Example classification logic
+    if area > 500 and perimeter > 100:
+        return "person"
+    elif area > 200 and aspect_ratio > 0.5:
+        return "person"
+    else:
+        return "other"
 
 
 def checkFolderExistence(folder_path):
