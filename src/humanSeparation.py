@@ -67,6 +67,6 @@ def extractHumanObject(grayscale_frame, alpha, background_model, binary_threshol
     cv2.drawContours(convex_hull_mask, [convex_hull], -1, (255), thickness=1)
 
     # Show the convex hull mask
-    cv2.imshow('convexHull', convex_hull_mask)
+    #cv2.imshow('convexHull', convex_hull_mask)
 
     return convex_hull_mask, background_model

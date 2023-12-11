@@ -28,15 +28,7 @@ def separateHumanFromObjectFrame(binary_mask_raw, human_binary_frame):
     return binary_mask_with_deleted_movement
 
 
-def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50):
-    '''
-    Separating objects and raw contours out of the given binary mask.
-
-    # TODO: Perform the filtering of the object contours: keep only those that have the
-    features that we are looking for from an object
-    # TODO: Find a better way to identify the objects. Currently, it looks very epilectical because it
-    always just randomizes the colors for each because they are not identified.
-    '''
+def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50, non_moving_color=(0, 255, 0)):
     # Apply dilation to connect nearby edges
     dilated_edges = cv2.dilate(binaryMaskRaw, None, iterations=dilation_iterations)
 
@@ -52,8 +44,23 @@ def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50)
         if area > min_blob_area:
             cv2.drawContours(blobs_mask, [contour], -1, 255, thickness=cv2.FILLED)
 
-    contours, _ = cv2.findContours(blobs_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    print('Amount of contours: ', contours.__len__())
+    # Highlight non-moving objects with a specific color
+    non_moving_objects_mask = (binaryMaskRaw - blobs_mask) > 0
+    blobs_mask_colored = cv2.cvtColor(blobs_mask, cv2.COLOR_GRAY2BGR)  # Convert to 3 channels
 
-    cv2.imshow('formBlobsAndContours', blobs_mask)
-    return contours, blobs_mask
+    # Create a separate array for color changes
+    color_changes = np.zeros_like(blobs_mask_colored)
+    color_changes[non_moving_objects_mask] = non_moving_color
+
+    # Combine the two arrays to get the final result
+    result_mask = blobs_mask_colored + color_changes
+
+    contours, _ = cv2.findContours(blobs_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    print('Amount of contours: ', len(contours))
+
+    cv2.imshow('formBlobsAndContours', result_mask)
+    return contours, result_mask
+
+
+
+
