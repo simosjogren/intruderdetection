@@ -4,7 +4,7 @@ import numpy as np
 
 
 # Local modules import
-from src.outputFileMaker import makeFrameDict, writeOutputFileEXCEL
+from src.outputFileMaker import makeFrameDict, writeOutputFileEXCEL, classify_objects
 from src.humanSeparation import extractHumanObject
 from src.objectSeparation import handleEdgeDetection, getBinaryMaskForObject, formBlobsAndContours, separateHumanFromObjectFrame
 from src.userVisualization import applyContoursToImage
@@ -26,6 +26,7 @@ def play_video(video_path):
 
     alpha = 0.9999  # Adaptation rate for blind background updating
     background_model = None
+    previous_frame_data = None  # Initialize previous_frame_data
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -64,6 +65,17 @@ def play_video(video_path):
         # Export the given data to dict format as a JSON like object for future file export.
         frameData = makeFrameDict(object_contours, human_binary_frame, index)
         output_file.append(frameData)
+
+        # Pass current_frame_data and previous_frame_data to classifyBlob
+        current_frame_data = {
+            'frame_index': index,
+            'number_of_detected_objects': len(object_contours),
+            'frame_data': frameData['frame_data']
+        }
+        classify_objects(current_frame_data, previous_frame_data)
+
+        previous_frame_data = current_frame_data
+
 
         # Represent the objects to the user
         applyContoursToImage(frame, object_contours, human_binary_frame)

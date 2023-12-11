@@ -34,7 +34,7 @@ def makeFrameDict(contours, human_blob, frame_idx):
         object_data["solidity"] = solidity
 
         # Perform classification based on features
-        classification = classifyBlob(object_data)  # Implement your classification logic
+        classification = classifyBlob(object_data, frame_idx)  # Implement your classification logic
 
         object_data["classification"] = classification
         frame_data.append(object_data)
@@ -46,19 +46,50 @@ def makeFrameDict(contours, human_blob, frame_idx):
     }
 
 
-def classifyBlob(blob_data):
-    # Example feature extraction
+def classifyBlob(blob_data, frame_index):
     area = blob_data["area"]
     perimeter = blob_data["perimeter"]
-    aspect_ratio = blob_data["aspect_ratio"]  # Add this feature to the makeFrameDict function
+    aspect_ratio = blob_data["aspect_ratio"]
 
-    # Example classification logic
-    if area > 500 and perimeter > 100:
-        return "person"
-    elif area > 200 and aspect_ratio > 0.5:
+    # Example: Dynamic thresholds based on aspect ratio
+    aspect_ratio_threshold = 0.6 if frame_index < 5 else 0.4
+
+    # Example: Check if the blob characteristics are consistent with a human
+    if aspect_ratio > aspect_ratio_threshold and area > 300 and perimeter > 80:
         return "person"
     else:
         return "other"
+
+
+def classify_objects(current_frame_data, previous_frame_data):
+    frame_index = current_frame_data['frame_index']
+
+    for obj in current_frame_data['frame_data']:
+        # Extract features from the current object
+        area = obj['area']
+        perimeter = obj['perimeter']
+        aspect_ratio = obj['aspect_ratio']  # Ensure that aspect_ratio is calculated in makeFrameDict
+
+        # Extract features from the same object in the previous frame if available
+        if previous_frame_data:
+            previous_obj = find_matching_object(obj, previous_frame_data['frame_data'])
+            if previous_obj:
+                previous_area = previous_obj['area']
+                previous_perimeter = previous_obj['perimeter']
+                # Add more features as needed
+
+        # Use features for classification logic (modify as needed)
+        classification_result = classifyBlob(obj, frame_index)
+
+        # Add the classification result to the object data
+        obj['classification'] = classification_result
+
+# Helper function to find the matching object in the previous frame
+def find_matching_object(current_obj, previous_frame_data):
+    for obj in previous_frame_data:
+        if obj['identifier'] == current_obj['identifier']:
+            return obj
+    return None
 
 
 def checkFolderExistence(folder_path):
