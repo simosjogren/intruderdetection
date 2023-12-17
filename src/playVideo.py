@@ -76,7 +76,6 @@ def play_video(video_path):
 
         previous_frame_data = current_frame_data
 
-
         # Represent the objects to the user
         applyContoursToImage(frame, object_contours, human_binary_frame)
 

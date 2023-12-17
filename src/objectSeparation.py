@@ -1,32 +1,26 @@
 import cv2
 import numpy as np
 
+
 def handleEdgeDetection(gray_frame_filtered, lower_threshold=73, upper_threshold=74):
     '''
     Separates edges from the picture using adaptive thresholding and Canny edge detection.
     '''
     # Apply Gaussian blur before edge detection
-
     blurred_frame = cv2.GaussianBlur(gray_frame_filtered, (5, 5), 0)
 
-    # Apply adaptive thresholding
-    binary_mask = cv2.adaptiveThreshold(blurred_frame, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2)
-
-    # Apply Canny edge detection
+    # Canny edge detection with fine-tuned parameters
     edges = cv2.Canny(blurred_frame, lower_threshold, upper_threshold)
 
-    # Fine-tune the Canny edge detection parameters
-    edges = cv2.Canny(blurred_frame, lower_threshold, upper_threshold)
-
-    # Apply morphological operations for edge enhancement
+    # Hard-coded morphological operations for edge enhancement of the objects
     kernel = np.ones((3, 3), np.uint8)
     edges = cv2.dilate(edges, kernel, iterations=2)
     edges = cv2.erode(edges, kernel, iterations=1)
 
-
     gray_frame_filtered = cv2.bitwise_and(gray_frame_filtered, gray_frame_filtered, mask=edges)
     cv2.imshow('handleEdgeDetection', gray_frame_filtered)
     return gray_frame_filtered
+
 
 def applyHoughTransform(edges):
     '''
@@ -34,6 +28,7 @@ def applyHoughTransform(edges):
     '''
     lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=100)
     return lines
+
 
 def getBinaryMaskForObject(gray_frame_filtered):
     '''
@@ -43,10 +38,12 @@ def getBinaryMaskForObject(gray_frame_filtered):
     cv2.imshow('getBinaryMask', binary_mask)
     return binary_mask
 
+
 def separateHumanFromObjectFrame(binary_mask_raw, human_binary_frame):
     binary_mask_with_deleted_movement = cv2.bitwise_and(binary_mask_raw, cv2.bitwise_not(human_binary_frame))
     cv2.imshow('separateHumanFromObjectFrame', binary_mask_with_deleted_movement)
     return binary_mask_with_deleted_movement
+
 
 def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50, non_moving_color=(0, 255, 0)):
     # Apply dilation to connect nearby edges
@@ -84,10 +81,4 @@ def formBlobsAndContours(binaryMaskRaw, dilation_iterations=1, min_blob_area=50,
 
     cv2.imshow('formBlobsAndContours', result_mask)
     return contours, result_mask
-
-
-
-
-
-
 

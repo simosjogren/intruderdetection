@@ -2,7 +2,7 @@ import argparse
 from src.playVideo import play_video
 
 '''
-Main launcher for the process.
+Main launcher for the intruder detection process.
 Usage: python main.py
 '''
 
