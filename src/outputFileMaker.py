@@ -4,15 +4,35 @@ import pandas as pd
 import numpy as np
 import cv2
 
-def makeFrameDict(contours, human_blob, frame_idx):
+def makeFrameDict(contours, human_contours, frame_idx):
     print("Index: ", frame_idx)
 
     amount_of_objects = len(contours)  # Use len() directly for simplicity
     frame_data = []
+    human_found = 0     # This needs to be 0 if human didnt found, 1 if found.
 
+    # Find the human contours. We capture the human contours only from the moving item
+    if (len(human_contours) > 0):
+        human_found = 1
+        human_contour = max(human_contours, key=cv2.contourArea)   # Filters out the noise contours
+
+        # Lets handle the moving human object separately
+        object_data = {}
+        object_data["identifier"] = 0
+        object_data["area"] = int(cv2.contourArea(human_contour))
+        object_data["perimeter"] = int(cv2.arcLength(human_contour, True))
+        object_data["classification"] = 'human'
+
+        # TODO: Implement the aspectratio, etc extras.
+    
+        frame_data.append(object_data)
+
+    amount_of_objects += human_found
+
+    # Find the object contours
     for n, contour in enumerate(contours):
         object_data = {}
-        object_data["identifier"] = n
+        object_data["identifier"] = n + human_found     # human_found is incremental step
         object_data["area"] = int(cv2.contourArea(contour))
         object_data["perimeter"] = int(cv2.arcLength(contour, True))
 
@@ -33,10 +53,7 @@ def makeFrameDict(contours, human_blob, frame_idx):
         object_data["circularity"] = circularity
         object_data["solidity"] = solidity
 
-        # Perform classification based on features
-        classification = classifyBlob(object_data, frame_idx)  # Implement your classification logic
-
-        object_data["classification"] = classification
+        object_data["classification"] = 'object'
         frame_data.append(object_data)
 
     return {
@@ -47,6 +64,7 @@ def makeFrameDict(contours, human_blob, frame_idx):
 
 
 def classifyBlob(blob_data, frame_index):
+    # TODO: FIX TO WORK LIKE WITH THE CURRENT IMPLEMENTATION
     area = blob_data["area"]
     perimeter = blob_data["perimeter"]
     aspect_ratio = blob_data["aspect_ratio"]
@@ -62,6 +80,7 @@ def classifyBlob(blob_data, frame_index):
 
 
 def classify_objects(current_frame_data, previous_frame_data):
+    # TODO: FIX TO WORK LIKE WITH THE CURRENT IMPLEMENTATION
     frame_index = current_frame_data['frame_index']
 
     for obj in current_frame_data['frame_data']:

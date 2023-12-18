@@ -2,7 +2,6 @@ import cv2
 import argparse
 import numpy as np
 
-
 # Local modules import
 from src.outputFileMaker import makeFrameDict, writeOutputFileEXCEL, classify_objects
 from src.humanSeparation import extractHumanObject
@@ -61,20 +60,12 @@ def play_video(video_path):
 
         # Find and separate the contours (gives only raw format of contours, needs filtering.)
         object_contours, _ = formBlobsAndContours(binary_mask_with_deleted_movement)
+        human_contours, _ = cv2.findContours(human_binary_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Export the given data to dict format as a JSON like object for future file export.
-        frameData = makeFrameDict(object_contours, human_binary_frame, index)
+        frameData = makeFrameDict(object_contours, human_contours, index)
+        print('size of framedata: ', len(frameData))
         output_file.append(frameData)
-
-        # Pass current_frame_data and previous_frame_data to classifyBlob
-        current_frame_data = {
-            'frame_index': index,
-            'number_of_detected_objects': len(object_contours),
-            'frame_data': frameData['frame_data']
-        }
-        classify_objects(current_frame_data, previous_frame_data)
-
-        previous_frame_data = current_frame_data
 
         # Represent the objects to the user
         applyContoursToImage(frame, object_contours, human_binary_frame)
